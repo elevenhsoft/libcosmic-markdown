@@ -1,0 +1,17 @@
+[package]
+name = "custom-markdown-widget"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+syntect = "5.2.0"
+
+[dependencies.cosmic-text]
+git = "https://github.com/pop-os/cosmic-text"
+default-features = false
+features = ["syntect"]
+
+[dependencies.libcosmic]
+git = "https://github.com/pop-os/libcosmic"
+default-features = false
+features = ["winit", "wgpu"]
