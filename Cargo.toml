@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 syntect = "5.2.0"
+markdown = "0.3.0"
 
 [dependencies.cosmic-text]
 git = "https://github.com/pop-os/cosmic-text"

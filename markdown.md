@@ -22,7 +22,6 @@ Here are some basic Markdown syntax elements:
 
 ## Example
 
-```markdown
 # Heading One
 ## Heading Two
 
@@ -36,3 +35,29 @@ This is a paragraph with **bold text** and *italic text*.
 2. Second
 3. Third
 
+# Example Markdown Document
+
+This is a sample markdown document demonstrating how to include an embedded code snippet.
+
+
+## Code Snippet
+
+Below is an example of a simple Python function that adds two numbers:
+
+```python
+def add(a, b):
+    """
+    This function takes two numbers and returns their sum.
+    
+    Parameters:
+    a (int or float): The first number.
+    b (int or float): The second number.
+    
+    Returns:
+    int or float: The sum of the two numbers.
+    """
+    return a + b
+
+# Example usage:
+result = add(3, 5)
+print(f"The sum of 3 and 5 is {result}")
