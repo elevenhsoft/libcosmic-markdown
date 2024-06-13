@@ -1,6 +1,6 @@
 use cosmic::{app::Core, widget, Application, Command};
 
-use crate::markdown::{markdown, markdown_to_string};
+use crate::markdown::markdown;
 
 #[derive(Debug, Clone)]
 pub enum Message {}
@@ -48,8 +48,7 @@ impl Application for Window {
     fn view(&self) -> cosmic::prelude::Element<Self::Message> {
         // let code1 = markdown(&self.content1, "rs");
         // let code2 = markdown(&self.content2, "py");
-        let (text, lang) = markdown_to_string(&self.content3);
-        let md3 = markdown(text, &lang);
+        let md3 = markdown(self.content3.clone());
 
         let row = widget::row().push(widget::scrollable(md3));
         row.into()

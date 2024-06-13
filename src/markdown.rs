@@ -32,20 +32,22 @@ pub struct Markdown {
 }
 
 impl Markdown {
-    pub fn new(content: String, syntax_ext: &str) -> Self {
+    pub fn new(content: String) -> Self {
         let metrics = Metrics::new(14.0, 20.0);
         let mut font_system = FONT_SYSTEM.get().unwrap().lock().unwrap();
         let mut buffer = Buffer::new(&mut font_system, metrics);
         let syntax_system = SYNTAX_SYSTEM.get().unwrap();
 
+        let (text, lang) = markdown_to_string(&content);
+
         buffer.borrow_with(&mut font_system).set_text(
-            &content,
+            &text,
             Attrs::new(),
             cosmic_text::Shaping::Advanced,
         );
 
         let mut editor = SyntaxEditor::new(buffer, syntax_system, "base16-eighties.dark").unwrap();
-        editor.syntax_by_extension(syntax_ext);
+        editor.syntax_by_extension(&lang);
 
         Self {
             syntax_editor: Mutex::new(editor),
@@ -100,6 +102,14 @@ impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
         editor.with_buffer_mut(|buffer| {
             let mut layout_lines = 0;
             let mut width = 0.0;
+
+            buffer.set_size(
+                &mut font_system,
+                Some(max_width),
+                Some(buffer.metrics().line_height),
+            );
+
+            buffer.set_wrap(&mut font_system, cosmic_text::Wrap::Word);
 
             for line in buffer.lines.iter() {
                 match line.layout_opt() {
@@ -320,8 +330,8 @@ fn draw_rect(
     }
 }
 
-pub fn markdown(content: String, syntax_ext: &str) -> Markdown {
-    Markdown::new(content, syntax_ext)
+pub fn markdown(content: String) -> Markdown {
+    Markdown::new(content)
 }
 
 impl<'a, Message> From<Markdown> for Element<'a, Message> {
@@ -381,8 +391,6 @@ fn parse_block(block: Block) -> (String, String) {
         }
         markdown::Block::CodeBlock(lang, code) => {
             if let Some(lang) = lang {
-                // result.push_str(&format!("{} code:\n", lang));
-
                 if language.is_empty() {
                     language.push_str(language_to_extension(lang));
                 }
