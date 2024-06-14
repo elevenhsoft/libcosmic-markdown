@@ -24,8 +24,14 @@ Here are some basic Markdown syntax elements:
 
 # Heading One
 ## Heading Two
+### Heading Three
+#### Heading Four
+##### Heading Five
+###### Heading Six
 
 This is a paragraph with **bold text** and *italic text*.
+
+> This is a block quote
 
 - Item 1
 - Item 2
@@ -62,3 +68,29 @@ def add(a, b):
 result = add(3, 5)
 print(f"The sum of 3 and 5 is {result}")
 ```
+
+## and this is rust
+
+```rust
+fn parse_span(span: Span) -> String {
+    let mut result = String::new();
+
+    match span {
+        markdown::Span::Break => result.push('\n'),
+        markdown::Span::Text(text) => result.push_str(&text),
+        markdown::Span::Code(code) => result.push_str(&code),
+        markdown::Span::Link(_, _, _) => {}
+        markdown::Span::Image(_, _, _) => {}
+        markdown::Span::Emphasis(emphasis) => {
+            for span in emphasis {
+                result.push_str(&parse_span(span));
+            }
+        }
+        markdown::Span::Strong(strong) => {
+            for span in strong {
+                result.push_str(&parse_span(span));
+            }
+        }
+    }
+    
+}```
