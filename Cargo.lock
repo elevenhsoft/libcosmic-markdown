@@ -1071,6 +1071,7 @@ name = "custom-markdown-widget"
 version = "0.1.0"
 dependencies = [
  "cosmic-text",
+ "lazy_static",
  "libcosmic",
  "markdown",
  "syntect",

@@ -48,7 +48,7 @@ impl Application for Window {
     fn view(&self) -> cosmic::prelude::Element<Self::Message> {
         // let code1 = markdown(&self.content1, "rs");
         // let code2 = markdown(&self.content2, "py");
-        let md3 = markdown(self.content3.clone());
+        let md3 = markdown(&self.content3);
 
         let row = widget::row().push(widget::scrollable(md3));
         row.into()
