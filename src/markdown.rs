@@ -24,8 +24,24 @@ use syntect::{
 
 use crate::{FONT_SYSTEM, SWASH_CACHE};
 
+fn syntax_theme() -> &'static str {
+    if !cosmic::theme::is_dark() {
+        return "base16-ocean.light";
+    }
+
+    "base16-ocean.dark"
+}
+
+fn buffer_text_color() -> cosmic_text::Color {
+    if !cosmic::theme::is_dark() {
+        return cosmic_text::Color(0x000000);
+    }
+
+    cosmic_text::Color(0xFFFFFF)
+}
+
 pub struct Markdown {
-    editor: Mutex<Editor<'static>>,
+    syntax_editor: Mutex<Editor<'static>>,
     font_system: &'static Mutex<FontSystem>,
     margin: f32,
 }
@@ -47,7 +63,7 @@ impl Markdown {
         });
 
         Self {
-            editor: Mutex::new(editor),
+            syntax_editor: Mutex::new(editor),
             font_system,
             margin: 0.0,
         }
@@ -92,7 +108,7 @@ impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
         let mut font_system = self.font_system.lock().unwrap();
         let max_width = limits.max().width - self.margin;
 
-        let mut editor = self.editor.lock().unwrap();
+        let mut editor = self.syntax_editor.lock().unwrap();
         editor.borrow_with(&mut font_system).shape_as_needed(true);
 
         editor.with_buffer_mut(|buffer| {
@@ -111,7 +127,7 @@ impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
             for line in buffer.lines.iter() {
                 match line.layout_opt() {
                     Some(layout) => {
-                        layout_lines += 1;
+                        layout_lines += layout.len();
 
                         for l in layout.iter() {
                             if layout_lines > 1 {
@@ -156,7 +172,7 @@ impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
 
         let mut swash_cache = SWASH_CACHE.get().unwrap().lock().unwrap();
         let mut font_system = self.font_system.lock().unwrap();
-        let mut editor = self.editor.lock().unwrap();
+        let mut editor = self.syntax_editor.lock().unwrap();
 
         let scale_factor = style.scale_factor as f32;
 
@@ -201,7 +217,7 @@ impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
                 buffer.draw(
                     &mut font_system,
                     &mut swash_cache,
-                    cosmic_text::Color(0xFFFFFF),
+                    buffer_text_color(),
                     |x, y, w, h, color| {
                         draw_rect(
                             pixels,
@@ -357,6 +373,7 @@ fn set_buffer_text(
         collect_spans.iter().copied(),
         attrs,
         Shaping::Advanced,
+        None,
     )
 }
 
@@ -535,7 +552,7 @@ fn highlight_code<'a>(
     let ts = ThemeSet::load_defaults();
 
     let syntax = ps.find_syntax_by_extension(extension).unwrap();
-    let mut h = HighlightLines::new(syntax, &ts.themes["base16-ocean.dark"]);
+    let mut h = HighlightLines::new(syntax, &ts.themes[syntax_theme()]);
     for line in LinesWithEndings::from(code) {
         let ranges: Vec<(Style, &str)> = h.highlight_line(line, &ps).unwrap();
 
