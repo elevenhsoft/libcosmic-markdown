@@ -125,28 +125,25 @@ impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
             buffer.set_wrap(&mut font_system, cosmic_text::Wrap::Word);
 
             for line in buffer.lines.iter() {
-                match line.layout_opt() {
-                    Some(layout) => {
-                        layout_lines += layout.len();
+                if let Some(layout) = line.layout_opt() {
+                    layout_lines += layout.len();
 
-                        for l in layout.iter() {
-                            if layout_lines > 1 {
-                                width = max_width;
+                    for l in layout.iter() {
+                        if layout_lines > 1 {
+                            width = max_width;
 
-                                break;
-                            }
-                            width = l.w;
+                            break;
                         }
+                        width = l.w;
+                    }
 
-                        for l in layout.iter() {
-                            if let Some(line_height) = l.line_height_opt {
-                                height += line_height;
-                            } else {
-                                height += buffer.metrics().line_height;
-                            }
+                    for l in layout.iter() {
+                        if let Some(line_height) = l.line_height_opt {
+                            height += line_height;
+                        } else {
+                            height += buffer.metrics().line_height;
                         }
                     }
-                    None => (),
                 }
             }
 
