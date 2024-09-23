@@ -1,9 +1,11 @@
-use cosmic::{app::Core, widget, Application, Command};
+use cosmic::{app::Core, iced::clipboard, widget, Application, Command};
 
 use crate::markdown::markdown;
 
 #[derive(Debug, Clone)]
-pub enum Message {}
+pub enum Message {
+    Clipboard(String),
+}
 
 pub struct Window {
     core: Core,
@@ -45,10 +47,16 @@ impl Application for Window {
         )
     }
 
+    fn update(&mut self, message: Self::Message) -> cosmic::app::Command<Self::Message> {
+        match message {
+            Message::Clipboard(selection) => clipboard::write(selection),
+        }
+    }
+
     fn view(&self) -> cosmic::prelude::Element<Self::Message> {
         // let code1 = markdown(&self.content1, "rs");
         // let code2 = markdown(&self.content2, "py");
-        let md3 = markdown(&self.content3);
+        let md3 = markdown(&self.content3).on_copy(Message::Clipboard);
 
         let row = widget::row().push(widget::scrollable(md3));
         row.into()

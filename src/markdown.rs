@@ -2,11 +2,12 @@ use std::sync::Mutex;
 
 use cosmic::{
     iced::{
+        mouse::{self, ScrollDelta},
         Length::{self},
         Size,
     },
     iced_core::{
-        image, layout,
+        event, image, layout,
         widget::{tree, Widget},
     },
     Element, Renderer,
@@ -40,13 +41,13 @@ fn buffer_text_color() -> cosmic_text::Color {
     cosmic_text::Color(0xFFFFFF)
 }
 
-pub struct Markdown {
-    syntax_editor: Mutex<Editor<'static>>,
+pub struct Markdown<'a, Message> {
+    syntax_editor: Mutex<Editor<'a>>,
     font_system: &'static Mutex<FontSystem>,
-    margin: f32,
+    on_copy: Option<Box<dyn Fn(String) -> Message + 'a>>,
 }
 
-impl Markdown {
+impl<'a, Message> Markdown<'a, Message> {
     pub fn new(content: &str) -> Self {
         let metrics = metrics(14.0);
         let font_system = FONT_SYSTEM.get().unwrap();
@@ -65,17 +66,21 @@ impl Markdown {
         Self {
             syntax_editor: Mutex::new(editor),
             font_system,
-            margin: 0.0,
+            on_copy: None,
         }
     }
 
-    pub fn margin(&mut self, margin: f32) {
-        self.margin = margin;
+    pub fn on_copy(mut self, on_copy: impl Fn(String) -> Message + 'a) -> Self {
+        self.on_copy = Some(Box::new(on_copy));
+        self
     }
 }
 
 pub struct State {
     handle_opt: Mutex<Option<image::Handle>>,
+    dragging: bool,
+    scrolling: Option<ScrollDelta>,
+    copy_mode: bool,
 }
 
 impl State {
@@ -83,11 +88,14 @@ impl State {
     pub fn new() -> State {
         State {
             handle_opt: Mutex::new(None),
+            dragging: false,
+            scrolling: None,
+            copy_mode: false,
         }
     }
 }
 
-impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
+impl<'a, Message> Widget<Message, cosmic::Theme, Renderer> for Markdown<'a, Message> {
     fn size(&self) -> Size<cosmic::iced::Length> {
         Size {
             width: Length::Shrink,
@@ -106,7 +114,7 @@ impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
         limits: &layout::Limits,
     ) -> layout::Node {
         let mut font_system = self.font_system.lock().unwrap();
-        let max_width = limits.max().width - self.margin;
+        let max_width = limits.max().width;
 
         let mut editor = self.syntax_editor.lock().unwrap();
         editor.borrow_with(&mut font_system).shape_as_needed(true);
@@ -162,7 +170,7 @@ impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
         _theme: &cosmic::Theme,
         style: &cosmic::iced_core::renderer::Style,
         layout: cosmic::iced_core::Layout<'_>,
-        _cursor: cosmic::iced_core::mouse::Cursor,
+        cursor: cosmic::iced_core::mouse::Cursor,
         _viewport: &cosmic::iced::Rectangle,
     ) {
         let state = tree.state.downcast_ref::<State>();
@@ -209,29 +217,55 @@ impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
 
         let mut handle_opt = state.handle_opt.lock().unwrap();
 
-        if editor.redraw() || handle_opt.is_none() {
-            editor.with_buffer(|buffer| {
-                buffer.draw(
+        if let Some(ScrollDelta::Lines { x: _x, y }) = state.scrolling {
+            if y != 0.0 {
+                editor.action(
                     &mut font_system,
-                    &mut swash_cache,
-                    buffer_text_color(),
-                    |x, y, w, h, color| {
-                        draw_rect(
-                            pixels,
-                            Canvas {
-                                w: image_w,
-                                h: image_h,
-                            },
-                            Canvas {
-                                w: w as i32,
-                                h: h as i32,
-                            },
-                            Offset { x, y },
-                            color,
-                        );
-                    },
+                    cosmic_text::Action::Scroll { lines: -y as i32 },
                 );
-            });
+            }
+        }
+
+        if !state.dragging {
+            if let Some(position) = cursor.position_in(layout.bounds()) {
+                let x = position.x as i32;
+                let y = position.y as i32;
+                editor.action(&mut font_system, cosmic_text::Action::Click { x, y })
+            }
+        }
+
+        if state.dragging {
+            if let Some(position) = cursor.position_in(layout.bounds()) {
+                let x = position.x as i32;
+                let y = position.y as i32;
+                editor.action(&mut font_system, cosmic_text::Action::Drag { x, y });
+            }
+        };
+
+        if editor.redraw() || handle_opt.is_none() {
+            editor.draw(
+                &mut font_system,
+                &mut swash_cache,
+                buffer_text_color(),
+                Color::rgba(255, 255, 255, 0),
+                Color::rgba(52, 152, 219, 150),
+                Color::rgba(255, 255, 255, 255),
+                |x, y, w, h, color| {
+                    draw_rect(
+                        pixels,
+                        Canvas {
+                            w: image_w,
+                            h: image_h,
+                        },
+                        Canvas {
+                            w: w as i32,
+                            h: h as i32,
+                        },
+                        Offset { x, y },
+                        color,
+                    );
+                },
+            )
         }
 
         *handle_opt = Some(image::Handle::from_pixels(
@@ -254,6 +288,51 @@ impl<Message> Widget<Message, cosmic::Theme, Renderer> for Markdown {
                 [0.0; 4],
             );
         }
+    }
+
+    fn on_event(
+        &mut self,
+        state: &mut tree::Tree,
+        event: cosmic::iced::Event,
+        _layout: layout::Layout<'_>,
+        _cursor: cosmic::iced_core::mouse::Cursor,
+        _renderer: &Renderer,
+        _clipboard: &mut dyn cosmic::iced_core::Clipboard,
+        shell: &mut cosmic::iced_core::Shell<'_, Message>,
+        _viewport: &cosmic::iced::Rectangle,
+    ) -> event::Status {
+        let state = state.state.downcast_mut::<State>();
+
+        if let event::Event::Mouse(ev) = event {
+            if let mouse::Event::ButtonPressed(_) = ev {
+                state.dragging = true;
+                state.copy_mode = true;
+            };
+            if let mouse::Event::ButtonReleased(_) = ev {
+                state.dragging = false;
+
+                if state.copy_mode {
+                    let editor = self.syntax_editor.lock().unwrap();
+                    let selection = editor.copy_selection();
+
+                    if let Some(text) = selection {
+                        if let Some(on_copy) = &self.on_copy {
+                            let message = (on_copy)(text);
+                            shell.publish(message);
+                        };
+                    }
+                }
+
+                state.copy_mode = false;
+            };
+            if let mouse::Event::WheelScrolled { delta } = ev {
+                state.scrolling = Some(delta)
+            }
+        }
+
+        state.scrolling = None;
+
+        event::Status::Ignored
     }
 }
 
@@ -342,12 +421,12 @@ fn draw_rect(
     }
 }
 
-pub fn markdown(content: &str) -> Markdown {
+pub fn markdown<'a, Message>(content: &str) -> Markdown<'a, Message> {
     Markdown::new(content)
 }
 
-impl<'a, Message> From<Markdown> for Element<'a, Message> {
-    fn from(value: Markdown) -> Self {
+impl<'a, Message: 'a> From<Markdown<'a, Message>> for Element<'a, Message> {
+    fn from(value: Markdown<'a, Message>) -> Self {
         Self::new(value)
     }
 }
